@@ -6,6 +6,19 @@ from db import get_db
 
 admin_bp = Blueprint('admin', __name__)
 
+def log_admin_action(action, details, user_id=None):
+    db = get_db()
+    cur = db.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO admin_logs (action, details, user_id, action_time)
+            VALUES (%s, %s, %s, NOW())
+        """, (action, details, user_id))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Failed to log admin action: {e}")
+
 @admin_bp.route('/employees', methods=['GET'])
 @cross_origin()
 def get_users():
@@ -84,6 +97,13 @@ def grant_access():
     """, (employee_id, server_id, valid_from, valid_to))
     
     db.commit()
+    
+    log_admin_action(
+        "grant_access",
+        f"Granted access to server {server_id} for employee {employee_id} from {valid_from} to {valid_to}",
+        employee_id
+    )
+    
     return jsonify({"message": "Доступ успешно выдан"})
 
 @admin_bp.route('/revoke-access/<int:access_id>', methods=['DELETE'])
@@ -93,10 +113,27 @@ def revoke_access(access_id):
     cur = db.cursor()
 
     cur.execute("""
+        SELECT employee_id, server_id FROM server_access WHERE id = %s
+    """, (access_id,))
+    access = cur.fetchone()
+    
+    if not access:
+        return jsonify({"error": "Доступ не найден"}), 404
+
+    employee_id, server_id = access
+
+    cur.execute("""
         DELETE FROM server_access WHERE id = %s
     """, (access_id,))
 
     db.commit()
+    
+    log_admin_action(
+        "revoke_access",
+        f"Revoked access {access_id} (server {server_id} for employee {employee_id})",
+        employee_id
+    )
+    
     return jsonify({"message": "Доступ успешно отозван"})
 
 @admin_bp.route('/access-requests', methods=['GET'])
@@ -164,6 +201,12 @@ def approve_request(request_id):
 
     db.commit()
 
+    log_admin_action(
+        "approve_request",
+        f"Approved request {request_id} for server {server_id}, employee {employee_id}",
+        employee_id
+    )
+
     cur.execute("""
         SELECT s.name, b.name, sa.granted_at, sa.valid_from, sa.valid_to
         FROM server_access sa
@@ -191,12 +234,29 @@ def reject_request(request_id):
     cur = db.cursor()
 
     cur.execute("""
+        SELECT employee_id, server_id FROM access_requests WHERE id = %s
+    """, (request_id,))
+    req = cur.fetchone()
+    
+    if not req:
+        return jsonify({"error": "Запрос не найден"}), 404
+        
+    employee_id, server_id = req
+
+    cur.execute("""
         UPDATE access_requests 
         SET status = 'rejected' 
         WHERE id = %s
     """, (request_id,))
 
     db.commit()
+    
+    log_admin_action(
+        "reject_request",
+        f"Rejected request {request_id} for server {server_id}, employee {employee_id}",
+        employee_id
+    )
+    
     return jsonify({"message": "Запрос отклонён"})
 
 @admin_bp.route('/blocks', methods=['GET'])
@@ -225,6 +285,12 @@ def add_block():
         cur.execute("INSERT INTO blocks (name) VALUES (%s) RETURNING id", (name,))
         block_id = cur.fetchone()[0]
         db.commit()
+        
+        log_admin_action(
+            "add_block",
+            f"Added new block {block_id} with name '{name}'"
+        )
+        
         return jsonify({"message": "Блок успешно добавлен", "id": block_id})
     except Exception as e:
         db.rollback()
@@ -255,6 +321,12 @@ def add_server():
         """, (name, block_id))
         server_id = cur.fetchone()[0]
         db.commit()
+        
+        log_admin_action(
+            "add_server",
+            f"Added new server {server_id} with name '{name}' in block {block_id}"
+        )
+        
         return jsonify({"message": "Сервер успешно добавлен", "id": server_id})
     except Exception as e:
         db.rollback()
@@ -267,12 +339,25 @@ def delete_server(server_id):
     cur = db.cursor()
 
     try:
+        cur.execute("SELECT name, block_id FROM servers WHERE id = %s", (server_id,))
+        server = cur.fetchone()
+        if not server:
+            return jsonify({"error": "Сервер не найден"}), 404
+            
+        server_name, block_id = server
+
         cur.execute("SELECT 1 FROM server_access WHERE server_id = %s", (server_id,))
         if cur.fetchone():
             return jsonify({"error": "Невозможно удалить сервер: есть связанные доступы"}), 400
 
         cur.execute("DELETE FROM servers WHERE id = %s", (server_id,))
         db.commit()
+        
+        log_admin_action(
+            "delete_server",
+            f"Deleted server {server_id} (name: '{server_name}', block: {block_id})"
+        )
+        
         return jsonify({"message": "Сервер успешно удален"})
     except Exception as e:
         db.rollback()
@@ -285,12 +370,25 @@ def delete_block(block_id):
     cur = db.cursor()
 
     try:
+        cur.execute("SELECT name FROM blocks WHERE id = %s", (block_id,))
+        block = cur.fetchone()
+        if not block:
+            return jsonify({"error": "Блок не найден"}), 404
+            
+        block_name = block[0]
+
         cur.execute("SELECT 1 FROM servers WHERE block_id = %s", (block_id,))
         if cur.fetchone():
             return jsonify({"error": "Невозможно удалить блок: есть связанные серверы"}), 400
 
         cur.execute("DELETE FROM blocks WHERE id = %s", (block_id,))
         db.commit()
+        
+        log_admin_action(
+            "delete_block",
+            f"Deleted block {block_id} (name: '{block_name}')"
+        )
+        
         return jsonify({"message": "Блок успешно удален"})
     except Exception as e:
         db.rollback()
