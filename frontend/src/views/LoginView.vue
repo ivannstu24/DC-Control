@@ -28,37 +28,63 @@
 
 <script>
 import axios from 'axios'
+import { useToast } from 'vue-toastification'
+import { useRouter } from 'vue-router'
 
 export default {
+  setup() {
+    const router = useRouter()
+    const toast = useToast()
+    return { router, toast }
+  },
   data() {
     return {
       username: '',
       password: '',
-      error: ''
+      error: '',
+      isLoading: false
     }
   },
   methods: {
     async login() {
       this.error = ''
+      this.isLoading = true
+      
       try {
-        const res = await axios.post('http://localhost:5000/api/auth/login', {
-          username: this.username,
-          password: this.password
-        })
+        const response = await axios.post(
+          'http://localhost:5000/api/auth/login', 
+          {
+            username: this.username,
+            password: this.password
+          },
+          {
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        )
 
-        const { id, role } = res.data
-        localStorage.setItem('userId', id)
-        localStorage.setItem('userRole', role)
-
-        if (role === 'admin') {
-          this.$router.push({ name: 'admin', query: { adminId: id } })
+        // Проверяем успешный ответ
+        if (response.data && response.data.id) {
+          // Перенаправляем в зависимости от роли
+          if (response.data.role === 'admin') {
+            this.router.push({ name: 'admin' })
+          } else {
+            this.router.push({ name: 'user' })
+          }
         } else {
-          this.$router.push({ name: 'user', query: { userId: id } })
+          this.error = 'Неверный ответ от сервера'
         }
       } catch (err) {
-        this.error = 'Неверный логин или пароль'
-        localStorage.removeItem('userId')
-        localStorage.removeItem('userRole')
+        console.error('Ошибка входа:', err)
+        if (err.response && err.response.status === 401) {
+          this.error = 'Неверный логин или пароль'
+        } else {
+          this.error = 'Ошибка соединения с сервером'
+        }
+      } finally {
+        this.isLoading = false
       }
     }
   }
@@ -66,6 +92,21 @@ export default {
 </script>
 
 <style scoped>
+
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255,255,255,.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-left: 10px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 .auth-container {
   display: flex;
   justify-content: center;

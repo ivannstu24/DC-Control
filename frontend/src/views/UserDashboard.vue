@@ -27,6 +27,27 @@ const formatDate = (date) => {
   return new Date(date).toLocaleDateString('ru-RU', options)
 }
 
+const checkAuth = async () => {
+  try {
+    await axios.get('http://localhost:5000/api/auth/check-auth', {
+      withCredentials: true
+    })
+  } catch (err) {
+    router.push('/login')
+  }
+}
+
+const logout = async () => {
+  try {
+    await axios.post('http://localhost:5000/api/auth/logout', {}, {
+      withCredentials: true
+    })
+    router.push('/login')
+  } catch (err) {
+    toast.error('Ошибка при выходе из системы')
+  }
+}
+
 const fetchData = async () => {
   try {
     const prevAccessCount = accesses.value.length
@@ -149,14 +170,10 @@ const getStatusText = (status) => {
   return statusMap[status] || 'Неизвестно'
 }
 
-onMounted(() => {
-  const userId = localStorage.getItem('userId')
-  const role = localStorage.getItem('userRole')
-  
-  // Двойная проверка - есть userId и роль user
-  if (!userId || role !== 'user') {
-    router.push('/login')
-  }
+
+
+onMounted(async () => {
+  await checkAuth()
   fetchData()
   fetchDataInterval.value = setInterval(fetchData, 10000)
 })
@@ -169,11 +186,7 @@ onUnmounted(() => {
   clearInterval(fetchDataInterval.value)
 })
 
-const logout = () => {
-  localStorage.removeItem('userId')
-  localStorage.removeItem('userRole')
-  router.push('/login')
-}
+
 </script>
 
 <template>

@@ -76,43 +76,7 @@ export default {
       success: ''
     }
   },
-  computed: {
-    isFormInvalid() {
-      return !!this.usernameError || !!this.passwordError || !!this.roleError || 
-             !this.username || !this.password || !this.role
-    }
-  },
   methods: {
-    validateUsername() {
-      const usernameRegex = /^[a-zA-Z0-9_-]{3,20}$/
-      if (!this.username) {
-        this.usernameError = 'Логин обязателен'
-      } else if (!usernameRegex.test(this.username)) {
-        this.usernameError = 'Логин должен быть 3-20 символов и содержать только буквы, цифры, _ или -'
-      } else {
-        this.usernameError = ''
-      }
-    },
-    validatePassword() {
-      if (!this.password) {
-        this.passwordError = 'Пароль обязателен'
-      } else if (this.password.length < 6) {
-        this.passwordError = 'Пароль должен быть не менее 6 символов'
-      } else if (!/[A-Z]/.test(this.password)) {
-        this.passwordError = 'Пароль должен содержать хотя бы одну заглавную букву'
-      } else if (!/[0-9]/.test(this.password)) {
-        this.passwordError = 'Пароль должен содержать хотя бы одну цифру'
-      } else {
-        this.passwordError = ''
-      }
-    },
-    validateRole() {
-      if (!this.role) {
-        this.roleError = 'Роль обязательна'
-      } else {
-        this.roleError = ''
-      }
-    },
     async register() {
       this.validateUsername()
       this.validatePassword()
@@ -128,6 +92,8 @@ export default {
           username: this.username,
           password: this.password,
           role: this.role
+        }, {
+          withCredentials: true
         })
         this.success = 'Регистрация успешна! Войдите в систему.'
         this.$router.push('/')

@@ -7,3 +7,5 @@ class Config:
     DB_PASS = os.environ.get('DB_PASS', '*')
     DB_HOST = os.environ.get('DB_HOST', 'localhost')
     DB_PORT = os.environ.get('DB_PORT', '5432')
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev_key')
+    JWT_ACCESS_TOKEN_EXPIRES = 3600 

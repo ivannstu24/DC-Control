@@ -3,10 +3,12 @@ import psycopg2
 from datetime import datetime
 from flask_cors import cross_origin
 from db import get_db
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 admin_bp = Blueprint('admin', __name__)
 
 def log_admin_action(action, details, user_id=None):
+
     db = get_db()
     cur = db.cursor()
     try:
@@ -21,6 +23,7 @@ def log_admin_action(action, details, user_id=None):
 
 @admin_bp.route('/employees', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_users():
     db = get_db()
     cur = db.cursor()
@@ -33,6 +36,7 @@ def get_users():
 
 @admin_bp.route('/servers', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_servers():
     db = get_db()
     cur = db.cursor()
@@ -47,6 +51,7 @@ def get_servers():
 
 @admin_bp.route('/accesses', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_accesses():
     db = get_db()
     cur = db.cursor()
@@ -69,6 +74,7 @@ def get_accesses():
 
 @admin_bp.route('/grant-access', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def grant_access():
     data = request.json
 
@@ -108,6 +114,7 @@ def grant_access():
 
 @admin_bp.route('/revoke-access/<int:access_id>', methods=['DELETE'])
 @cross_origin()
+@jwt_required()
 def revoke_access(access_id):
     db = get_db()
     cur = db.cursor()
@@ -138,6 +145,7 @@ def revoke_access(access_id):
 
 @admin_bp.route('/access-requests', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_access_requests():
     db = get_db()
     cur = db.cursor()
@@ -159,6 +167,7 @@ def get_access_requests():
 
 @admin_bp.route('/approve-request/<int:request_id>', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def approve_request(request_id):
     data = request.json
     
@@ -229,6 +238,7 @@ def approve_request(request_id):
 
 @admin_bp.route('/reject-request/<int:request_id>', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def reject_request(request_id):
     db = get_db()
     cur = db.cursor()
@@ -261,6 +271,7 @@ def reject_request(request_id):
 
 @admin_bp.route('/blocks', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_blocks():
     db = get_db()
     cur = db.cursor()
@@ -271,6 +282,7 @@ def get_blocks():
 
 @admin_bp.route('/add-block', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def add_block():
     data = request.json
     name = data.get('name')
@@ -298,6 +310,7 @@ def add_block():
 
 @admin_bp.route('/add-server', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def add_server():
     data = request.json
     name = data.get('name')
@@ -334,6 +347,7 @@ def add_server():
 
 @admin_bp.route('/delete-server/<int:server_id>', methods=['DELETE'])
 @cross_origin()
+@jwt_required()
 def delete_server(server_id):
     db = get_db()
     cur = db.cursor()
@@ -365,6 +379,7 @@ def delete_server(server_id):
 
 @admin_bp.route('/delete-block/<int:block_id>', methods=['DELETE'])
 @cross_origin()
+@jwt_required()
 def delete_block(block_id):
     db = get_db()
     cur = db.cursor()
