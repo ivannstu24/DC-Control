@@ -3,8 +3,16 @@ import psycopg2
 from datetime import datetime
 from flask_cors import cross_origin
 from db import get_db
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
 
 admin_bp = Blueprint('admin', __name__)
+
+def check_admin():
+    current_user = get_jwt_identity()
+    if current_user['role'] != 'admin':
+        return jsonify({"error": "Доступ запрещен"}), 403
+    return None
 
 def log_admin_action(action, details, user_id=None):
     db = get_db()
@@ -21,19 +29,30 @@ def log_admin_action(action, details, user_id=None):
 
 @admin_bp.route('/employees', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_users():
+    current_user = get_jwt_identity()
+    if current_user['role'] != 'admin':
+        return jsonify({"error": "Доступ запрещен"}), 403
+        
     db = get_db()
     cur = db.cursor()
 
-    cur.execute("""
-        SELECT id, username FROM users
-    """)
-    users = cur.fetchall()
-    return jsonify([{"id": user[0], "username": user[1]} for user in users])
+    try:
+        cur.execute("SELECT id, username FROM users")
+        users = cur.fetchall()
+        return jsonify([{"id": user[0], "username": user[1]} for user in users])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @admin_bp.route('/servers', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_servers():
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
     db = get_db()
     cur = db.cursor()
 
@@ -47,7 +66,12 @@ def get_servers():
 
 @admin_bp.route('/accesses', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_accesses():
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
     db = get_db()
     cur = db.cursor()
 
@@ -69,7 +93,11 @@ def get_accesses():
 
 @admin_bp.route('/grant-access', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def grant_access():
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
     data = request.json
 
     if not all(k in data for k in ('employee_id', 'server_id', 'valid_from', 'valid_to')):
@@ -108,7 +136,12 @@ def grant_access():
 
 @admin_bp.route('/revoke-access/<int:access_id>', methods=['DELETE'])
 @cross_origin()
+@jwt_required()
 def revoke_access(access_id):
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
     db = get_db()
     cur = db.cursor()
 
@@ -138,7 +171,13 @@ def revoke_access(access_id):
 
 @admin_bp.route('/access-requests', methods=['GET'])
 @cross_origin()
+@jwt_required()
+
 def get_access_requests():
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
     db = get_db()
     cur = db.cursor()
 
@@ -159,7 +198,12 @@ def get_access_requests():
 
 @admin_bp.route('/approve-request/<int:request_id>', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def approve_request(request_id):
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
     data = request.json
     
     if not all(k in data for k in ('valid_from', 'valid_to')):
@@ -229,7 +273,11 @@ def approve_request(request_id):
 
 @admin_bp.route('/reject-request/<int:request_id>', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def reject_request(request_id):
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
     db = get_db()
     cur = db.cursor()
 
@@ -261,7 +309,12 @@ def reject_request(request_id):
 
 @admin_bp.route('/blocks', methods=['GET'])
 @cross_origin()
+@jwt_required()
 def get_blocks():
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
     db = get_db()
     cur = db.cursor()
 
@@ -271,7 +324,12 @@ def get_blocks():
 
 @admin_bp.route('/add-block', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def add_block():
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
     data = request.json
     name = data.get('name')
 
@@ -298,7 +356,12 @@ def add_block():
 
 @admin_bp.route('/add-server', methods=['POST'])
 @cross_origin()
+@jwt_required()
 def add_server():
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
     data = request.json
     name = data.get('name')
     block_id = data.get('block_id')
@@ -334,7 +397,11 @@ def add_server():
 
 @admin_bp.route('/delete-server/<int:server_id>', methods=['DELETE'])
 @cross_origin()
+@jwt_required()
 def delete_server(server_id):
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
     db = get_db()
     cur = db.cursor()
 
@@ -365,7 +432,12 @@ def delete_server(server_id):
 
 @admin_bp.route('/delete-block/<int:block_id>', methods=['DELETE'])
 @cross_origin()
+@jwt_required()
 def delete_block(block_id):
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+        
     db = get_db()
     cur = db.cursor()
 

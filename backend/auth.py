@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import create_access_token
 from db import get_db
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+import psycopg2
+
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -52,8 +54,10 @@ def log_user_action(user_id, action_type, status, ip_address=None, user_agent=No
         current_app.logger.error(f"Ошибка при логировании действия пользователя: {e}")
         db.rollback()
 
-@auth_bp.route('/register', methods=['POST'])
+@auth_bp.route('/register', methods=['POST', 'OPTIONS'])
 def register():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -110,6 +114,21 @@ def login():
         log_user_action(user_id, 'login', 'failed: wrong password', ip_address, user_agent)
         return jsonify({'msg': 'Неверные учетные данные'}), 401
 
+    access_token = create_access_token(identity={'id': user_id, 'role': role})
+    
     log_user_action(user_id, 'login', 'success', ip_address, user_agent)
 
-    return jsonify({'id': user_id, 'role': role}), 200
+    return jsonify({
+        'access_token': access_token,
+        'user': {
+            'id': user_id,
+            'role': role,
+            'username': username
+        }
+    }), 200
+
+@auth_bp.route('/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    current_user = get_jwt_identity()
+    return jsonify(logged_in_as=current_user), 200

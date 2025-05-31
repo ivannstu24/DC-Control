@@ -1,11 +1,17 @@
 from flask import Blueprint, jsonify, request
 from db import get_db
 from datetime import datetime
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 user_bp = Blueprint('user_bp_unique', __name__, url_prefix='/api/user')
 
 @user_bp.route('/servers/<int:user_id>', methods=['GET'])
+@jwt_required()
 def get_servers(user_id):
+    current_user = get_jwt_identity()
+    if current_user['id'] != user_id and current_user['role'] != 'admin':
+        return jsonify({"error": "Доступ запрещен"}), 403
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -56,7 +62,12 @@ def get_servers(user_id):
     })
 
 @user_bp.route('/request-access', methods=['POST'])
+@jwt_required()
 def request_access():
+    current_user = get_jwt_identity()
+    if current_user['id'] != user_id and current_user['role'] != 'admin':
+        return jsonify({"error": "Доступ запрещен"}), 403
+
     data = request.get_json()
     print("Полученные данные:", data)
     
@@ -95,7 +106,12 @@ def request_access():
     return jsonify({"message": "Запрос создан", "request_id": cur.lastrowid}), 200
 
 @user_bp.route('/update-server-status', methods=['POST'])
+@jwt_required()
 def update_server_status():
+    current_user = get_jwt_identity()
+    if current_user['id'] != user_id and current_user['role'] != 'admin':
+        return jsonify({"error": "Доступ запрещен"}), 403
+
     data = request.get_json()
     user_id = data.get('user_id')
     server_id = data.get('server_id')

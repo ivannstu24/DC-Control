@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 
-const adminName = ref(route.query.adminName || 'Администратор')
+const adminName = ref(localStorage.getItem('username') || 'Администратор')
 
 const employees = ref([])
 const servers = ref([])
@@ -160,18 +160,37 @@ const deleteBlock = async (blockId) => {
 }
 
 const logout = () => {
+  localStorage.removeItem('jwtToken')
+  localStorage.removeItem('userId')
+  localStorage.removeItem('userRole')
+  localStorage.removeItem('username')
+  delete axios.defaults.headers.common['Authorization']
   router.push('/login')
 }
 
-onMounted(() => {
-  const role = localStorage.getItem('userRole')
-  if (role !== 'admin') {
-    router.push('/login')
-  }
-  fetchData()
-  fetchAccessRequests()
-})
 
+onMounted(async () => {
+  const token = localStorage.getItem('jwtToken')
+  const role = localStorage.getItem('userRole')
+  
+  if (!token || role !== 'admin') {
+    router.push('/login')
+    return
+  }
+  
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  
+  try {
+    await fetchData()
+    await fetchAccessRequests()
+  } catch (error) {
+    if (error.response?.status === 401) {
+      logout()
+    } else {
+      console.error('Ошибка загрузки данных:', error)
+    }
+  }
+})
 
 </script>
 <template>

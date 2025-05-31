@@ -5,10 +5,11 @@ import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 
-const userId = ref(route.query.userId || localStorage.getItem('userId'))
-const username = ref('')
+const userId = ref(localStorage.getItem('userId'))
+const username = ref(localStorage.getItem('username'))
 const servers = ref([])
 const accesses = ref([])
 const fetchDataInterval = ref(null)
@@ -150,28 +151,31 @@ const getStatusText = (status) => {
 }
 
 onMounted(() => {
-  const userId = localStorage.getItem('userId')
+  const token = localStorage.getItem('jwtToken')
   const role = localStorage.getItem('userRole')
   
-  // Двойная проверка - есть userId и роль user
-  if (!userId || role !== 'user') {
+  if (!token || role !== 'user') {
     router.push('/login')
+    return
   }
+  
+  // Устанавливаем токен для всех запросов
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  
   fetchData()
   fetchDataInterval.value = setInterval(fetchData, 10000)
 })
 
 onUnmounted(() => {
-  const userId = localStorage.getItem('userId')
-  if (!userId) {
-    router.push('/login')
-  }
   clearInterval(fetchDataInterval.value)
 })
 
 const logout = () => {
+  localStorage.removeItem('jwtToken')
   localStorage.removeItem('userId')
   localStorage.removeItem('userRole')
+  localStorage.removeItem('username')
+  delete axios.defaults.headers.common['Authorization']
   router.push('/login')
 }
 </script>

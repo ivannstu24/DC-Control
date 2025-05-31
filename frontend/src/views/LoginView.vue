@@ -39,27 +39,47 @@ export default {
   },
   methods: {
     async login() {
-      this.error = ''
-      try {
-        const res = await axios.post('http://localhost:5000/api/auth/login', {
-          username: this.username,
-          password: this.password
-        })
+  this.error = ''
+  try {
+    const response = await axios.post('http://localhost:5000/api/auth/login', {
+      username: this.username,
+      password: this.password
+    })
 
-        const { id, role } = res.data
-        localStorage.setItem('userId', id)
-        localStorage.setItem('userRole', role)
-
-        if (role === 'admin') {
-          this.$router.push({ name: 'admin', query: { adminId: id } })
-        } else {
-          this.$router.push({ name: 'user', query: { userId: id } })
-        }
-      } catch (err) {
-        this.error = 'Неверный логин или пароль'
-        localStorage.removeItem('userId')
-        localStorage.removeItem('userRole')
-      }
+    const { access_token, user } = response.data
+    
+    // Сохраняем токен и данные пользователя
+    localStorage.setItem('jwtToken', access_token)
+    localStorage.setItem('userId', user.id)
+    localStorage.setItem('userRole', user.role)
+    localStorage.setItem('username', user.username)
+    
+    // Устанавливаем заголовок авторизации для всех последующих запросов
+    axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
+    
+    if (user.role === 'admin') {
+      this.$router.push('/admin')
+    } else {
+      this.$router.push('/user')
+    }
+  } catch (err) {
+    this.error = 'Неверный логин или пароль'
+    console.error('Ошибка входа:', err)
+  }
+},
+    clearAuthData() {
+      localStorage.removeItem('jwtToken')
+      localStorage.removeItem('userId')
+      localStorage.removeItem('userRole')
+      localStorage.removeItem('username')
+      delete axios.defaults.headers.common['Authorization']
+    }
+  },
+  mounted() {
+    // При загрузке страницы проверяем наличие токена
+    const token = localStorage.getItem('jwtToken')
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
     }
   }
 }
