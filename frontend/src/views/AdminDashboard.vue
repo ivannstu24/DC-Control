@@ -60,7 +60,6 @@ const approveRequest = async (requestId) => {
   
   try {
     await axios.post(`http://localhost:5000/api/admin/approve-request/${requestId}`, {
-      withCredentials: true,
       valid_from: validFrom,
       valid_to: validTo
     })
@@ -68,30 +67,6 @@ const approveRequest = async (requestId) => {
     await fetchData()
   } catch (err) {
     console.error("Ошибка при одобрении запроса:", err)
-  }
-}
-
-const checkAuth = async () => {
-  try {
-    const response = await axios.get('http://localhost:5000/api/auth/check-auth', {
-      withCredentials: true
-    })
-    if (response.data.role !== 'admin') {
-      router.push('/login')
-    }
-  } catch (err) {
-    router.push('/login')
-  }
-}
-
-const logout = async () => {
-  try {
-    await axios.post('http://localhost:5000/api/auth/logout', {}, {
-      withCredentials: true
-    })
-    router.push('/login')
-  } catch (err) {
-    console.error('Ошибка при выходе:', err)
   }
 }
 
@@ -184,9 +159,15 @@ const deleteBlock = async (blockId) => {
   }
 }
 
+const logout = () => {
+  router.push('/login')
+}
 
-onMounted(async () => {
-  await checkAuth()
+onMounted(() => {
+  const role = localStorage.getItem('userRole')
+  if (role !== 'admin') {
+    router.push('/login')
+  }
   fetchData()
   fetchAccessRequests()
 })
