@@ -1,17 +1,15 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from db import get_db
 from datetime import datetime
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
-user_bp = Blueprint('user_bp_unique', __name__, url_prefix='/api/user')
+user_bp = Blueprint('user', __name__, url_prefix='/api/user')
 
-@user_bp.route('/servers/<int:user_id>', methods=['GET'])
-@jwt_required()
-def get_servers(user_id):
-    current_user = get_jwt_identity()
-    if current_user['id'] != user_id and current_user['role'] != 'admin':
-        return jsonify({"error": "Доступ запрещен"}), 403
+@user_bp.route('/servers', methods=['GET'])
+def get_servers():
+    if 'user_id' not in session:
+        return jsonify({"error": "Не авторизован"}), 401
 
+    user_id = session['user_id']
     conn = get_db()
     cur = conn.cursor()
 
@@ -62,28 +60,19 @@ def get_servers(user_id):
     })
 
 @user_bp.route('/request-access', methods=['POST'])
-@jwt_required()
 def request_access():
-    current_user = get_jwt_identity()
-    if current_user['id'] != user_id and current_user['role'] != 'admin':
-        return jsonify({"error": "Доступ запрещен"}), 403
+    if 'user_id' not in session:
+        return jsonify({"error": "Не авторизован"}), 401
 
+    user_id = session['user_id']
     data = request.get_json()
-    print("Полученные данные:", data)
-    
-    employee_id = data.get('employee_id')
     server_id = data.get('server_id')
 
-    if not employee_id or not server_id:
-        print("Ошибка: отсутствуют обязательные поля")
-        return jsonify({"error": "Требуются employee_id и server_id"}), 400
+    if not server_id:
+        return jsonify({"error": "Требуется server_id"}), 400
 
     conn = get_db()
     cur = conn.cursor()
-
-    cur.execute("SELECT 1 FROM users WHERE id = %s", (employee_id,))
-    if not cur.fetchone():
-        return jsonify({"error": "Пользователь не найден"}), 404
 
     cur.execute("SELECT 1 FROM servers WHERE id = %s", (server_id,))
     if not cur.fetchone():
@@ -92,7 +81,7 @@ def request_access():
     cur.execute("""
         SELECT id FROM access_requests 
         WHERE employee_id = %s AND server_id = %s AND status = 'pending'
-    """, (employee_id, server_id))
+    """, (user_id, server_id))
     
     if cur.fetchone():
         return jsonify({"error": "Запрос уже существует"}), 400
@@ -100,25 +89,23 @@ def request_access():
     cur.execute("""
         INSERT INTO access_requests (employee_id, server_id, status, created_at)
         VALUES (%s, %s, 'pending', %s)
-    """, (employee_id, server_id, datetime.utcnow()))
+    """, (user_id, server_id, datetime.utcnow()))
     
     conn.commit()
-    return jsonify({"message": "Запрос создан", "request_id": cur.lastrowid}), 200
+    return jsonify({"message": "Запрос создан"}), 200
 
 @user_bp.route('/update-server-status', methods=['POST'])
-@jwt_required()
 def update_server_status():
-    current_user = get_jwt_identity()
-    if current_user['id'] != user_id and current_user['role'] != 'admin':
-        return jsonify({"error": "Доступ запрещен"}), 403
+    if 'user_id' not in session:
+        return jsonify({"error": "Не авторизован"}), 401
 
+    user_id = session['user_id']
     data = request.get_json()
-    user_id = data.get('user_id')
     server_id = data.get('server_id')
     status = data.get('status')
 
-    if not all([user_id, server_id, status]):
-        return jsonify({"error": "Необходимы user_id, server_id и status"}), 400
+    if not all([server_id, status]):
+        return jsonify({"error": "Необходимы server_id и status"}), 400
 
     if status not in ['running', 'paused', 'stopped', 'restarting']:
         return jsonify({"error": "Недопустимый статус сервера"}), 400
@@ -134,7 +121,7 @@ def update_server_status():
         """, (user_id, server_id))
         
         if not cur.fetchone():
-            return jsonify({"error": "У пользователя нет активного доступа к этому серверу"}), 403
+            return jsonify({"error": "У вас нет активного доступа к этому серверу"}), 403
 
         cur.execute("""
             INSERT INTO server_statuses (server_id, user_id, status)

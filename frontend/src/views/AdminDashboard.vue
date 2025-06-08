@@ -1,13 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 
-const route = useRoute()
 const router = useRouter()
 
-const adminName = ref(localStorage.getItem('username') || 'Администратор')
-
+const adminName = ref('Администратор')
 const employees = ref([])
 const servers = ref([])
 const blocks = ref([])
@@ -45,7 +43,9 @@ const toggleSection = (section) => {
 }
 
 const fetchAccessRequests = async () => {
-  const res = await axios.get('http://localhost:5000/api/admin/access-requests')
+  const res = await axios.get('http://localhost:5000/api/admin/access-requests', {
+    withCredentials: true
+  })
   accessRequests.value = res.data
 }
 
@@ -62,6 +62,8 @@ const approveRequest = async (requestId) => {
     await axios.post(`http://localhost:5000/api/admin/approve-request/${requestId}`, {
       valid_from: validFrom,
       valid_to: validTo
+    }, {
+      withCredentials: true
     })
     await fetchAccessRequests()
     await fetchData()
@@ -71,26 +73,45 @@ const approveRequest = async (requestId) => {
 }
 
 const rejectRequest = async (requestId) => {
-  await axios.post(`http://localhost:5000/api/admin/reject-request/${requestId}`)
+  await axios.post(`http://localhost:5000/api/admin/reject-request/${requestId}`, {}, {
+    withCredentials: true
+  })
   await fetchAccessRequests()
 }
 
 const fetchData = async () => {
-  const [emp, srv, acc, blk] = await Promise.all([
-    axios.get('http://localhost:5000/api/admin/employees'),
-    axios.get('http://localhost:5000/api/admin/servers'),
-    axios.get('http://localhost:5000/api/admin/accesses'),
-    axios.get('http://localhost:5000/api/admin/blocks')
-  ])
-  employees.value = emp.data
-  servers.value = srv.data
-  accesses.value = acc.data
-  blocks.value = blk.data
+  try {
+    const authCheck = await axios.get('http://localhost:5000/api/auth/check-auth', {
+      withCredentials: true
+    })
+
+    if (!authCheck.data.isAuthenticated || authCheck.data.role !== 'admin') {
+      router.push('/login')
+      return
+    }
+
+    const [emp, srv, acc, blk] = await Promise.all([
+      axios.get('http://localhost:5000/api/admin/employees', { withCredentials: true }),
+      axios.get('http://localhost:5000/api/admin/servers', { withCredentials: true }),
+      axios.get('http://localhost:5000/api/admin/accesses', { withCredentials: true }),
+      axios.get('http://localhost:5000/api/admin/blocks', { withCredentials: true })
+    ])
+    
+    employees.value = emp.data
+    servers.value = srv.data
+    accesses.value = acc.data
+    blocks.value = blk.data
+  } catch (err) {
+    console.error('Ошибка при загрузке данных:', err)
+    router.push('/login')
+  }
 }
 
 const grantAccess = async () => {
   try {
-    await axios.post('http://localhost:5000/api/admin/grant-access', form.value)
+    await axios.post('http://localhost:5000/api/admin/grant-access', form.value, {
+      withCredentials: true
+    })
     form.value = { 
       employee_id: '', 
       server_id: '', 
@@ -104,7 +125,9 @@ const grantAccess = async () => {
 }
 
 const revokeAccess = async (id) => {
-  await axios.delete(`http://localhost:5000/api/admin/revoke-access/${id}`)
+  await axios.delete(`http://localhost:5000/api/admin/revoke-access/${id}`, {
+    withCredentials: true
+  })
   await fetchData()
 }
 
@@ -112,6 +135,8 @@ const addBlock = async () => {
   try {
     const response = await axios.post('http://localhost:5000/api/admin/add-block', {
       name: newBlockForm.value.name
+    }, {
+      withCredentials: true
     })
     alert(response.data.message)
     newBlockForm.value.name = ''
@@ -126,6 +151,8 @@ const addServer = async () => {
     const response = await axios.post('http://localhost:5000/api/admin/add-server', {
       name: newServerForm.value.name,
       block_id: newServerForm.value.block_id
+    }, {
+      withCredentials: true
     })
     alert(response.data.message)
     newServerForm.value = { name: '', block_id: '' }
@@ -139,7 +166,9 @@ const deleteServer = async (serverId) => {
   if (!confirm('Вы уверены, что хотите удалить этот сервер?')) return
   
   try {
-    const response = await axios.delete(`http://localhost:5000/api/admin/delete-server/${serverId}`)
+    const response = await axios.delete(`http://localhost:5000/api/admin/delete-server/${serverId}`, {
+      withCredentials: true
+    })
     alert(response.data.message)
     await fetchData()
   } catch (err) {
@@ -151,7 +180,9 @@ const deleteBlock = async (blockId) => {
   if (!confirm('Вы уверены, что хотите удалить этот блок?')) return
   
   try {
-    const response = await axios.delete(`http://localhost:5000/api/admin/delete-block/${blockId}`)
+    const response = await axios.delete(`http://localhost:5000/api/admin/delete-block/${blockId}`, {
+      withCredentials: true
+    })
     alert(response.data.message)
     await fetchData()
   } catch (err) {
@@ -159,40 +190,25 @@ const deleteBlock = async (blockId) => {
   }
 }
 
-const logout = () => {
-  localStorage.removeItem('jwtToken')
-  localStorage.removeItem('userId')
-  localStorage.removeItem('userRole')
-  localStorage.removeItem('username')
-  delete axios.defaults.headers.common['Authorization']
-  router.push('/login')
+const logout = async () => {
+  try {
+    await axios.post('http://localhost:5000/api/auth/logout', {}, {
+      withCredentials: true
+    })
+    router.push('/login')
+  } catch (err) {
+    console.error('Ошибка при выходе:', err)
+  }
 }
 
-
-onMounted(async () => {
-  const token = localStorage.getItem('jwtToken')
-  const role = localStorage.getItem('userRole')
+onMounted(() => {
   
-  if (!token || role !== 'admin') {
-    router.push('/login')
-    return
-  }
-  
-  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-  
-  try {
-    await fetchData()
-    await fetchAccessRequests()
-  } catch (error) {
-    if (error.response?.status === 401) {
-      logout()
-    } else {
-      console.error('Ошибка загрузки данных:', error)
-    }
-  }
+  fetchData()
+  fetchAccessRequests()
 })
-
 </script>
+
+
 <template>
   <div class="admin-dashboard">
     <div class="dashboard-header">
@@ -699,7 +715,6 @@ onMounted(async () => {
   color: var(--text);
 }
 
-/* Заголовок */
 .dashboard-header {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: var(--white);
@@ -723,14 +738,12 @@ onMounted(async () => {
   opacity: 0.9;
 }
 
-/* Основной контент */
 .dashboard-content {
   max-width: 1400px;
   margin: 0 auto;
   padding: 2rem;
 }
 
-/* Статистика */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -781,7 +794,6 @@ onMounted(async () => {
   color: var(--text-light);
 }
 
-/* Сетка секций */
 .sections-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -789,7 +801,6 @@ onMounted(async () => {
   margin-bottom: 2rem;
 }
 
-/* Секции */
 .dashboard-section {
   background: var(--white);
   border-radius: 12px;
@@ -856,7 +867,6 @@ onMounted(async () => {
   padding-bottom: 40px;
 }
 
-/* Элементы списка */
 .list-item {
   padding: 0.75rem 1.5rem;
   transition: background-color 0.2s ease;
@@ -1119,6 +1129,73 @@ button svg {
   .request-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+}
+
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .access-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .section-content {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .access-form {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .item-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-top: 1rem;
+  }
+  
+  .request-actions {
+    margin-top: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .dashboard-content {
+    padding: 1rem;
+  }
+  
+  .list-item {
+    padding: 0.75rem;
+  }
+  
+  .item-content {
+    flex-wrap: wrap;
+  }
+  
+  .section-header {
+    padding: 1rem;
   }
 }
 </style>

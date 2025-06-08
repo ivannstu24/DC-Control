@@ -1398,4 +1398,35 @@ export default {
     width: 100%;
   }
 }
+
+@media (max-width: 480px) {
+  .hero h1 {
+    font-size: 2rem;
+  }
+  
+  .subtitle {
+    font-size: 1rem;
+  }
+  
+  .cta-buttons {
+    flex-direction: column;
+  }
+  
+  .primary-btn, .secondary-btn {
+    width: 100%;
+  }
+  
+  .navbar {
+    padding: 1rem;
+  }
+  
+  .nav-links {
+    gap: 0.5rem;
+  }
+  
+  .login-btn, .register-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+}
 </style>

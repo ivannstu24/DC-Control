@@ -28,8 +28,15 @@
 
 <script>
 import axios from 'axios'
+import { useToast } from 'vue-toastification'
+import { useRouter } from 'vue-router'
 
 export default {
+  setup() {
+    const toast = useToast()
+    const router = useRouter()
+    return { toast, router }
+  },
   data() {
     return {
       username: '',
@@ -39,48 +46,28 @@ export default {
   },
   methods: {
     async login() {
-  this.error = ''
   try {
     const response = await axios.post('http://localhost:5000/api/auth/login', {
       username: this.username,
       password: this.password
+    }, {
+      withCredentials: true
     })
 
-    const { access_token, user } = response.data
-    
-    // Сохраняем токен и данные пользователя
-    localStorage.setItem('jwtToken', access_token)
-    localStorage.setItem('userId', user.id)
-    localStorage.setItem('userRole', user.role)
-    localStorage.setItem('username', user.username)
-    
-    // Устанавливаем заголовок авторизации для всех последующих запросов
-    axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
-    
-    if (user.role === 'admin') {
-      this.$router.push('/admin')
-    } else {
-      this.$router.push('/user')
+    if (response.data.msg === 'Успешный вход') {
+      localStorage.setItem('isAuthenticated', 'true')
+      localStorage.setItem('userRole', response.data.role)
+      
+      if (response.data.role === 'admin') {
+        this.router.push('/admin')
+      } else {
+        this.router.push('/user')
+      }
     }
-  } catch (err) {
+  } catch (error) {
     this.error = 'Неверный логин или пароль'
-    console.error('Ошибка входа:', err)
   }
-},
-    clearAuthData() {
-      localStorage.removeItem('jwtToken')
-      localStorage.removeItem('userId')
-      localStorage.removeItem('userRole')
-      localStorage.removeItem('username')
-      delete axios.defaults.headers.common['Authorization']
-    }
-  },
-  mounted() {
-    // При загрузке страницы проверяем наличие токена
-    const token = localStorage.getItem('jwtToken')
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    }
+}
   }
 }
 </script>
@@ -240,6 +227,24 @@ export default {
   .logo-icon {
     width: 40px;
     height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 2rem 1.5rem;
+  }
+  
+  .auth-title {
+    font-size: 1.5rem;
+  }
+  
+  .auth-form {
+    gap: 1.25rem;
+  }
+  
+  .auth-btn {
+    padding: 0.875rem;
   }
 }
 </style>

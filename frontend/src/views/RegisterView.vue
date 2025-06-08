@@ -128,7 +128,7 @@ export default {
           username: this.username,
           password: this.password,
           role: this.role
-        })
+        }, {withCredentials: true })
         this.success = 'Регистрация успешна! Войдите в систему.'
         this.$router.push('/')
       } catch (err) {
@@ -363,6 +363,28 @@ export default {
   .logo-icon {
     width: 40px;
     height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 2rem 1.5rem;
+  }
+  
+  .auth-title {
+    font-size: 1.5rem;
+  }
+  
+  .auth-form {
+    gap: 1.25rem;
+  }
+  
+  .auth-btn {
+    padding: 0.875rem;
+  }
+  
+  .form-select, .form-input {
+    padding: 0.75rem 1rem;
   }
 }
 </style>

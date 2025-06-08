@@ -1,15 +1,13 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 
-const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
-const userId = ref(localStorage.getItem('userId'))
-const username = ref(localStorage.getItem('username'))
+const username = ref('')
 const servers = ref([])
 const accesses = ref([])
 const fetchDataInterval = ref(null)
@@ -30,8 +28,20 @@ const formatDate = (date) => {
 
 const fetchData = async () => {
   try {
+    const authCheck = await axios.get('http://localhost:5000/api/auth/check-auth', {
+      withCredentials: true
+    })
+
+    if (!authCheck.data.isAuthenticated) {
+      router.push('/login')
+      return
+    }
+
     const prevAccessCount = accesses.value.length
-    const res = await axios.get(`http://localhost:5000/api/user/servers/${userId.value}`)
+    const res = await axios.get('http://localhost:5000/api/user/servers', {
+      withCredentials: true
+    })
+    
     servers.value = res.data.servers
     accesses.value = res.data.accesses
     username.value = res.data.username
@@ -45,15 +55,17 @@ const fetchData = async () => {
   } catch (err) {
     toast.error('Ошибка при загрузке данных')
     console.error('Ошибка при загрузке данных:', err)
+    router.push('/login')
   }
 }
 
 const requestAccess = async (serverId) => {
   try {
     requestedServers.value.add(serverId)
-    const response = await axios.post('http://localhost:5000/api/user/request-access', {
-      employee_id: userId.value,
+    await axios.post('http://localhost:5000/api/user/request-access', {
       server_id: serverId
+    }, {
+      withCredentials: true
     })
 
     toast.success('Запрос отправлен администратору')
@@ -67,10 +79,12 @@ const requestAccess = async (serverId) => {
 const updateServerStatus = async (serverId, status) => {
   try {
     const response = await axios.post('http://localhost:5000/api/user/update-server-status', {
-      user_id: userId.value,
       server_id: serverId,
       status: status
+    }, {
+      withCredentials: true
     })
+    
     serverStatuses.value[serverId] = status
     return true
   } catch (error) {
@@ -84,7 +98,6 @@ const manageServer = async (serverId, action) => {
   loadingStates.value[`${serverId}_${action}`] = true
   
   try {
-    // Проверяем, есть ли активный доступ
     const access = accesses.value.find(a => a.server_id === serverId)
     if (access && access.valid_to && new Date(access.valid_to) < new Date()) {
       toast.error('Срок действия доступа истек')
@@ -150,18 +163,18 @@ const getStatusText = (status) => {
   return statusMap[status] || 'Неизвестно'
 }
 
-onMounted(() => {
-  const token = localStorage.getItem('jwtToken')
-  const role = localStorage.getItem('userRole')
-  
-  if (!token || role !== 'user') {
+const logout = async () => {
+  try {
+    await axios.post('http://localhost:5000/api/auth/logout', {}, {
+      withCredentials: true
+    })
     router.push('/login')
-    return
+  } catch (err) {
+    console.error('Ошибка при выходе:', err)
   }
-  
-  // Устанавливаем токен для всех запросов
-  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-  
+}
+
+onMounted(() => {
   fetchData()
   fetchDataInterval.value = setInterval(fetchData, 10000)
 })
@@ -169,15 +182,6 @@ onMounted(() => {
 onUnmounted(() => {
   clearInterval(fetchDataInterval.value)
 })
-
-const logout = () => {
-  localStorage.removeItem('jwtToken')
-  localStorage.removeItem('userId')
-  localStorage.removeItem('userRole')
-  localStorage.removeItem('username')
-  delete axios.defaults.headers.common['Authorization']
-  router.push('/login')
-}
 </script>
 
 <template>
@@ -667,6 +671,50 @@ const logout = () => {
   .control-btn {
     font-size: 0.8rem;
     padding: 0.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.5rem;
+  }
+  
+  .user-status {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .server-controls {
+    flex-direction: column;
+  }
+  
+  .control-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-dashboard {
+    padding: 1rem;
+  }
+  
+  .dashboard-header, .dashboard-section {
+    padding: 1.25rem;
+  }
+  
+  .user-greeting h1 {
+    font-size: 1.5rem;
+  }
+  
+  .server-card, .access-card {
+    padding: 1rem;
+  }
+  
+  .request-btn {
+    padding: 0.625rem;
+    font-size: 0.85rem;
   }
 }
 </style>
